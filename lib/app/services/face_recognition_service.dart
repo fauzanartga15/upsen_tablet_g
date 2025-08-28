@@ -1,39 +1,54 @@
-import 'dart:math' as math;
+// lib/app/services/face_recognition_service.dart - Updated with proper GetX service pattern
 import 'dart:typed_data';
-
-import 'package:image/image.dart' as img;
+import 'dart:math' as math;
+import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
+import 'package:image/image.dart' as img;
 
-class FaceRecognitionService {
+class FaceRecognitionService extends GetxService {
   static const String modelPath = 'assets/models/mobile_face_net.tflite';
   static const int inputSize = 112;
   static const int embeddingSize = 192;
 
   Interpreter? _interpreter;
-  bool _isModelLoaded = false;
+  final RxBool _isModelLoaded = false.obs;
 
-  static final FaceRecognitionService _instance =
-      FaceRecognitionService._internal();
-  factory FaceRecognitionService() => _instance;
-  FaceRecognitionService._internal();
+  bool get isModelLoaded => _isModelLoaded.value;
 
-  Future<bool> loadModel() async {
+  // Proper GetxService initialization
+  static Future<FaceRecognitionService> init() async {
+    final service = FaceRecognitionService();
+    await service._loadModel();
+    return service;
+  }
+
+  Future<bool> _loadModel() async {
     try {
+      print("Loading MobileFaceNet model from $modelPath...");
+
       _interpreter = await Interpreter.fromAsset(modelPath);
-      _isModelLoaded = true;
+
+      final inputShape = _interpreter!.getInputTensor(0).shape;
+      final outputShape = _interpreter!.getOutputTensor(0).shape;
+
+      print("Model loaded successfully!");
+      print("Input shape: $inputShape");
+      print("Output shape: $outputShape");
+
+      _isModelLoaded.value = true;
       return true;
     } catch (e) {
-      print('Error loading face recognition model: $e');
-      _isModelLoaded = false;
+      print("Error loading model: $e");
+      _isModelLoaded.value = false;
       return false;
     }
   }
 
-  bool get isModelLoaded => _isModelLoaded;
-
+  // Generate face embedding
   Future<List<double>?> generateEmbedding(Uint8List imageBytes) async {
-    if (!_isModelLoaded) {
-      print('Model not loaded');
+    if (!_isModelLoaded.value) {
+      print("Model not loaded");
       return null;
     }
 
@@ -53,7 +68,7 @@ class FaceRecognitionService {
       final embedding = List<double>.from(output[0]);
       return _normalizeEmbedding(embedding);
     } catch (e) {
-      print('Error generating embedding: $e');
+      print("Error generating embedding: $e");
       return null;
     }
   }
@@ -66,7 +81,7 @@ class FaceRecognitionService {
         height: inputSize,
       );
 
-      final input = List.generate(
+      return List.generate(
         1,
         (b) => List.generate(
           inputSize,
@@ -95,10 +110,8 @@ class FaceRecognitionService {
           ),
         ),
       );
-
-      return input;
     } catch (e) {
-      print('Error preprocessing image: $e');
+      print("Error preprocessing image: $e");
       return null;
     }
   }
@@ -128,11 +141,18 @@ class FaceRecognitionService {
     }
 
     if (norm1 == 0.0 || norm2 == 0.0) return 0.0;
-    return dotProduct / (math.sqrt(norm1) * math.sqrt(norm2));
+
+    final similarity = dotProduct / (math.sqrt(norm1) * math.sqrt(norm2));
+    return similarity.clamp(-1.0, 1.0);
   }
 
-  void dispose() {
+  double similarityToPercentage(double similarity) {
+    return ((similarity + 1.0) / 2.0 * 100.0).clamp(0.0, 100.0);
+  }
+
+  @override
+  void onClose() {
     _interpreter?.close();
-    _isModelLoaded = false;
+    super.onClose();
   }
 }

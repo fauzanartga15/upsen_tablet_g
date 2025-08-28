@@ -1,7 +1,7 @@
 import 'package:get/get.dart';
 
-class CameraController extends GetxController {
-  //TODO: Implement CameraController
+class SettingsController extends GetxController {
+  //TODO: Implement SettingsController
 
   final count = 0.obs;
   @override

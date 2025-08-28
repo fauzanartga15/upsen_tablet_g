@@ -18,9 +18,9 @@ class AppTheme {
   static const Color textSecondary = Color(0xFF757575);
   static const Color textHint = Color(0xFFbdbdbd);
 
-  // Background colors
-  static const Color backgroundPrimary = Color(0xFFfafafa);
-  static const Color backgroundSecondary = Color(0xFFf5f5f5);
+  // Background colors - FIXED: Use Color instead of Gradient
+  static const Color backgroundPrimary = Color(0xFFe0f2f1); // Light teal
+  static const Color backgroundSecondary = Color(0xFFb2dfdb);
   static const Color surface = Colors.white;
 
   // Gradients
@@ -67,7 +67,7 @@ class AppTheme {
     ],
   );
 
-  // Responsive helpers
+  // Responsive helpers - FIXED: Proper BuildContext parameter
   static double getResponsivePadding(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     if (width > 1000) return 24; // Tablet
@@ -117,7 +117,7 @@ class AppTheme {
   static TextStyle get bodySmall =>
       const TextStyle(fontSize: 12, color: textSecondary);
 
-  // Button styles
+  // Button helper - FIXED: Made it a static method
   static Widget gradientButton({
     required String text,
     required VoidCallback onPressed,
@@ -138,13 +138,13 @@ class AppTheme {
           onTap: onPressed,
           borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (icon != null) ...[
                   Icon(icon, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                 ],
                 Text(
                   text,

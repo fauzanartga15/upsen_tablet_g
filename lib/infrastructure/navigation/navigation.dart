@@ -33,13 +33,28 @@ class Nav {
     ),
     GetPage(
       name: Routes.CAMERA,
-      page: () => const CameraScreen(),
+      page: () => const CameraViewScreen(),
       binding: CameraControllerBinding(),
     ),
     GetPage(
       name: Routes.SUCCESS,
       page: () => const SuccessScreen(),
       binding: SuccessControllerBinding(),
+    ),
+    GetPage(
+      name: Routes.ADMIN_LOGIN,
+      page: () => const AdminLoginScreen(),
+      binding: AdminLoginControllerBinding(),
+    ),
+    GetPage(
+      name: Routes.MANUAL_ENTRY,
+      page: () => const ManualEntryScreen(),
+      binding: ManualEntryControllerBinding(),
+    ),
+    GetPage(
+      name: Routes.SETTINGS,
+      page: () => const SettingsScreen(),
+      binding: SettingsControllerBinding(),
     ),
   ];
 }
