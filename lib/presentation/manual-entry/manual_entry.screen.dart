@@ -101,10 +101,12 @@ class ManualEntryScreen extends GetView<ManualEntryController> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
-              border: Border.all(color: AppTheme.upsenTeal.withOpacity(0.3)),
+              border: Border.all(
+                color: AppTheme.upsenTeal.withValues(alpha: 0.3),
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 8,
                   offset: Offset(0, 2),
                 ),
@@ -278,12 +280,12 @@ class ManualEntryScreen extends GetView<ManualEntryController> {
     return Container(
       margin: EdgeInsets.only(bottom: isTablet ? 12 : 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
+        color: Colors.white.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
-        border: Border.all(color: AppTheme.upsenTeal.withOpacity(0.1)),
+        border: Border.all(color: AppTheme.upsenTeal.withValues(alpha: 0.1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: Offset(0, 2),
           ),
@@ -377,7 +379,7 @@ class ManualEntryScreen extends GetView<ManualEntryController> {
         children: [
           Expanded(
             child: AppTheme.gradientButton(
-              text: 'Back to Camera',
+              text: 'Camera',
               icon: Icons.camera_alt,
               onPressed: controller.goToCamera,
               isSecondary: true,

@@ -187,10 +187,10 @@ class SuccessScreen extends GetView<SuccessController> {
                     vertical: isTablet ? 8 : 6,
                   ),
                   decoration: BoxDecoration(
-                    color: _getConfidenceColor().withOpacity(0.1),
+                    color: _getConfidenceColor().withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(isTablet ? 12 : 10),
                     border: Border.all(
-                      color: _getConfidenceColor().withOpacity(0.3),
+                      color: _getConfidenceColor().withValues(alpha: 0.3),
                     ),
                   ),
                   child: Row(
@@ -351,9 +351,9 @@ class SuccessScreen extends GetView<SuccessController> {
     return Container(
       padding: EdgeInsets.all(isTablet ? 16 : 12),
       decoration: BoxDecoration(
-        color: itemColor.withOpacity(0.05),
+        color: itemColor.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(isTablet ? 12 : 10),
-        border: Border.all(color: itemColor.withOpacity(0.2)),
+        border: Border.all(color: itemColor.withValues(alpha: 0.2)),
       ),
       child: Column(
         children: [

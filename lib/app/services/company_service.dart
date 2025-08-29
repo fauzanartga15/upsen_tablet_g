@@ -60,7 +60,7 @@ class CompanyService extends GetxService {
 
   // Get company display name for UI
   String get companyDisplayName {
-    return _currentCompany.value?.name ?? 'Unknown Company';
+    return _currentCompany.value?.name ?? 'Infazio';
   }
 
   // Get company logo URL

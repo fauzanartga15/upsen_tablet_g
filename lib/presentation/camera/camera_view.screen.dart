@@ -1,9 +1,8 @@
-// lib/presentation/camera/camera_view.screen.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:camera/camera.dart';
 
+import '../../app/widget/face_overlay_painter.dart';
 import '../../infrastructure/theme/app-theme.dart';
 import 'controllers/camera_view.controller.dart';
 
@@ -20,11 +19,14 @@ class CameraViewScreen extends GetView<CameraViewController> {
       body: SafeArea(
         child: Stack(
           children: [
-            // Camera preview
+            // Background gradient for areas not covered by camera
+            _buildBackgroundGradient(),
+
+            // Camera preview with 4:3 aspect ratio
             _buildCameraPreview(context),
 
             // Face detection overlay
-            _buildFaceOverlay(),
+            _buildFaceOverlay(context),
 
             // Recognition status overlay
             _buildRecognitionStatus(isTablet),
@@ -37,97 +39,384 @@ class CameraViewScreen extends GetView<CameraViewController> {
 
             // Confidence progress
             _buildConfidenceProgress(isTablet),
+
+            // Corner decorations
+            _buildCornerDecorations(),
           ],
         ),
       ),
     );
   }
 
+  Widget _buildBackgroundGradient() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.black,
+            AppTheme.upsenTealDark.withValues(alpha: 0.3),
+            Colors.black,
+          ],
+          stops: [0.0, 0.5, 1.0],
+        ),
+      ),
+    );
+  }
+
   Widget _buildCameraPreview(BuildContext context) {
-    return Obx(() {
-      if (!controller.isInitialized.value ||
-          controller.cameraController == null) {
-        return Container(
-          width: double.infinity,
-          height: double.infinity,
-          color: Colors.black,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppTheme.upsenTeal.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: CircularProgressIndicator(
-                  color: AppTheme.upsenTeal,
-                  strokeWidth: 3,
-                ),
+    return Center(
+      child: Obx(() {
+        if (!controller.isInitialized.value ||
+            controller.cameraController == null) {
+          return _buildLoadingState();
+        }
+
+        return _buildCameraContainer(context);
+      }),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: Colors.black,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: AppTheme.upsenTeal.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: AppTheme.upsenTeal.withValues(alpha: 0.3),
+                width: 2,
               ),
-              const SizedBox(height: 24),
-              const Text(
-                'Initializing Camera...',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
-                ),
+            ),
+            child: Container(
+              padding: EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppTheme.upsenTeal.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Please allow camera permission',
-                style: TextStyle(color: Colors.white70, fontSize: 14),
+              child: CircularProgressIndicator(
+                color: AppTheme.upsenTeal,
+                strokeWidth: 3,
               ),
-              if (controller.errorMessage.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Container(
-                  margin: EdgeInsets.symmetric(horizontal: 32),
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red.withOpacity(0.3)),
+            ),
+          ),
+          const SizedBox(height: 32),
+          Text(
+            'Initializing Camera',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Please allow camera permission',
+            style: TextStyle(color: Colors.white70, fontSize: 16),
+          ),
+          if (controller.errorMessage.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            Container(
+              margin: EdgeInsets.symmetric(horizontal: 32),
+              padding: EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.error_outline, color: Colors.red, size: 32),
+                  SizedBox(height: 12),
+                  Text(
+                    'Camera Error',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  child: Text(
+                  SizedBox(height: 8),
+                  Text(
                     controller.errorMessage.value,
-                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                    style: TextStyle(color: Colors.red.shade300, fontSize: 14),
                     textAlign: TextAlign.center,
                   ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCameraContainer(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+
+    // Calculate 4:3 aspect ratio container size
+    final maxWidth = screenSize.width;
+    final maxHeight = screenSize.height * 0.85; // Leave space for UI elements
+
+    double containerWidth, containerHeight;
+
+    if (maxWidth / maxHeight > 3 / 4) {
+      // Height constrained
+      containerHeight = maxHeight;
+      containerWidth = containerHeight * (3 / 4);
+    } else {
+      // Width constrained
+      containerWidth = maxWidth;
+      containerHeight = containerWidth * (4 / 3);
+    }
+
+    return Container(
+      width: containerWidth,
+      height: containerHeight,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: AppTheme.upsenTeal.withValues(alpha: 0.5),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.upsenTeal.withValues(alpha: 0.3),
+            blurRadius: 20,
+            spreadRadius: 5,
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Stack(
+          children: [
+            // Camera preview
+            SizedBox(
+              width: containerWidth,
+              height: containerHeight,
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width:
+                      controller.cameraController!.value.previewSize?.height ??
+                      containerWidth,
+                  height:
+                      controller.cameraController!.value.previewSize?.width ??
+                      containerHeight,
+                  child: CameraPreview(controller.cameraController!),
                 ),
-              ],
+              ),
+            ),
+
+            // Scanning animation overlay
+            _buildScanningAnimation(),
+
+            // Corner scan indicators
+            _buildScanCorners(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScanningAnimation() {
+    return Obx(() {
+      if (!controller.isDetecting.value) return SizedBox.shrink();
+
+      return Positioned.fill(
+        child: Container(
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(22)),
+          child: Stack(
+            children: [
+              // Animated scanning line
+              AnimatedContainer(
+                duration: Duration(seconds: 2),
+                curve: Curves.easeInOut,
+                child: Container(
+                  height: 3,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.transparent,
+                        AppTheme.upsenTeal,
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
-        );
-      }
-
-      return SizedBox(
-        width: double.infinity,
-        height: double.infinity,
-        child: CameraPreview(controller.cameraController!),
+        ),
       );
     });
   }
 
-  Widget _buildFaceOverlay() {
+  Widget _buildScanCorners() {
     return Positioned.fill(
+      child: Container(
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(22)),
+        child: Stack(
+          children: [
+            // Top-left corner
+            Positioned(
+              top: 20,
+              left: 20,
+              child: Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: AppTheme.upsenTeal, width: 4),
+                    left: BorderSide(color: AppTheme.upsenTeal, width: 4),
+                  ),
+                ),
+              ),
+            ),
+            // Top-right corner
+            Positioned(
+              top: 20,
+              right: 20,
+              child: Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: AppTheme.upsenTeal, width: 4),
+                    right: BorderSide(color: AppTheme.upsenTeal, width: 4),
+                  ),
+                ),
+              ),
+            ),
+            // Bottom-left corner
+            Positioned(
+              bottom: 20,
+              left: 20,
+              child: Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: AppTheme.upsenTeal, width: 4),
+                    left: BorderSide(color: AppTheme.upsenTeal, width: 4),
+                  ),
+                ),
+              ),
+            ),
+            // Bottom-right corner
+            Positioned(
+              bottom: 20,
+              right: 20,
+              child: Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: AppTheme.upsenTeal, width: 4),
+                    right: BorderSide(color: AppTheme.upsenTeal, width: 4),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFaceOverlay(BuildContext context) {
+    return Center(
       child: Obx(() {
         if (controller.faces.isEmpty) return const SizedBox.shrink();
 
-        return CustomPaint(
-          painter: AttendanceFaceOverlayPainter(
-            faces: controller.faces,
-            confidence: controller.recognitionConfidence.value,
-            detectedUser: controller.detectedUser.value,
+        final screenSize = MediaQuery.of(context).size;
+        final maxWidth = screenSize.width;
+        final maxHeight = screenSize.height * 0.75;
+
+        double containerWidth, containerHeight;
+        if (maxWidth / maxHeight > 4 / 3) {
+          containerHeight = maxHeight;
+          containerWidth = containerHeight * (4 / 3);
+        } else {
+          containerWidth = maxWidth;
+          containerHeight = containerWidth * (3 / 4);
+        }
+
+        return SizedBox(
+          width: containerWidth,
+          height: containerHeight,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: CustomPaint(
+              painter: FaceOverlayPainter(
+                faces: controller.faces,
+                confidence: controller.recognitionConfidence.value,
+                detectedUser: controller.detectedUser.value,
+                imageSize: controller.getImageSize,
+                screenSize: Size(containerWidth, containerHeight),
+              ),
+            ),
           ),
         );
       }),
     );
   }
 
+  Widget _buildCornerDecorations() {
+    return Stack(
+      children: [
+        // Top corners
+        Positioned(
+          top: 0,
+          left: 0,
+          child: Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                colors: [
+                  AppTheme.upsenTeal.withValues(alpha: 0.3),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 0,
+          right: 0,
+          child: Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                colors: [
+                  AppTheme.upsenTeal.withValues(alpha: 0.3),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Keep existing methods but update positions for new layout
   Widget _buildConfidenceProgress(bool isTablet) {
     return Positioned(
-      top: isTablet ? 100 : 80,
+      top: isTablet ? 120 : 100,
       left: 20,
       right: 20,
       child: Obx(() {
@@ -140,10 +429,15 @@ class CameraViewScreen extends GetView<CameraViewController> {
         final isMedium = confidence >= 0.75;
 
         return Container(
-          padding: EdgeInsets.all(isTablet ? 16 : 12),
+          padding: EdgeInsets.all(isTablet ? 20 : 16),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.8),
-            borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
+            gradient: LinearGradient(
+              colors: [
+                Colors.black.withValues(alpha: 0.9),
+                Colors.black.withValues(alpha: 0.7),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color:
                   (isHigh
@@ -151,45 +445,104 @@ class CameraViewScreen extends GetView<CameraViewController> {
                           : isMedium
                           ? Colors.orange
                           : Colors.red)
-                      .withOpacity(0.5),
+                      .withValues(alpha: 0.5),
+              width: 2,
             ),
+            boxShadow: [
+              BoxShadow(
+                color:
+                    (isHigh
+                            ? Colors.green
+                            : isMedium
+                            ? Colors.orange
+                            : Colors.red)
+                        .withValues(alpha: 0.2),
+                blurRadius: 10,
+                spreadRadius: 2,
+              ),
+            ],
           ),
           child: Column(
             children: [
-              // Confidence percentage
+              // Confidence percentage with icon
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Recognition Confidence',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: isTablet ? 14 : 12,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  Row(
+                    children: [
+                      Icon(
+                        isHigh
+                            ? Icons.check_circle
+                            : isMedium
+                            ? Icons.warning
+                            : Icons.search,
+                        color: isHigh
+                            ? Colors.green
+                            : isMedium
+                            ? Colors.orange
+                            : Colors.red,
+                        size: isTablet ? 24 : 20,
+                      ),
+                      SizedBox(width: 12),
+                      Text(
+                        'Recognition Confidence',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: isTablet ? 16 : 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
-                  Text(
-                    '${(confidence * 100).toStringAsFixed(0)}%',
-                    style: TextStyle(
-                      color: isHigh
-                          ? Colors.green
-                          : isMedium
-                          ? Colors.orange
-                          : Colors.red,
-                      fontSize: isTablet ? 16 : 14,
-                      fontWeight: FontWeight.bold,
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color:
+                          (isHigh
+                                  ? Colors.green
+                                  : isMedium
+                                  ? Colors.orange
+                                  : Colors.red)
+                              .withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isHigh
+                            ? Colors.green
+                            : isMedium
+                            ? Colors.orange
+                            : Colors.red,
+                      ),
+                    ),
+                    child: Text(
+                      '${(confidence * 100).toStringAsFixed(0)}%',
+                      style: TextStyle(
+                        color: isHigh
+                            ? Colors.green
+                            : isMedium
+                            ? Colors.orange
+                            : Colors.red,
+                        fontSize: isTablet ? 18 : 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
               ),
-              SizedBox(height: isTablet ? 12 : 8),
+              SizedBox(height: isTablet ? 16 : 12),
 
-              // Progress bar
+              // Enhanced progress bar
               Container(
-                height: isTablet ? 8 : 6,
+                height: isTablet ? 12 : 10,
                 decoration: BoxDecoration(
                   color: Colors.grey.shade800,
-                  borderRadius: BorderRadius.circular(isTablet ? 4 : 3),
+                  borderRadius: BorderRadius.circular(isTablet ? 6 : 5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: FractionallySizedBox(
                   widthFactor: confidence,
@@ -198,12 +551,36 @@ class CameraViewScreen extends GetView<CameraViewController> {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: isHigh
-                            ? [Colors.green.shade400, Colors.green.shade600]
+                            ? [
+                                Colors.green.shade300,
+                                Colors.green.shade600,
+                                Colors.green.shade400,
+                              ]
                             : isMedium
-                            ? [Colors.orange.shade400, Colors.orange.shade600]
-                            : [Colors.red.shade400, Colors.red.shade600],
+                            ? [
+                                Colors.orange.shade300,
+                                Colors.orange.shade600,
+                                Colors.orange.shade400,
+                              ]
+                            : [
+                                Colors.red.shade300,
+                                Colors.red.shade600,
+                                Colors.red.shade400,
+                              ],
                       ),
-                      borderRadius: BorderRadius.circular(isTablet ? 4 : 3),
+                      borderRadius: BorderRadius.circular(isTablet ? 6 : 5),
+                      boxShadow: [
+                        BoxShadow(
+                          color:
+                              (isHigh
+                                      ? Colors.green
+                                      : isMedium
+                                      ? Colors.orange
+                                      : Colors.red)
+                                  .withValues(alpha: 0.4),
+                          blurRadius: 4,
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -211,7 +588,7 @@ class CameraViewScreen extends GetView<CameraViewController> {
 
               // Threshold indicators
               if (confidence > 0) ...[
-                SizedBox(height: isTablet ? 8 : 6),
+                SizedBox(height: isTablet ? 12 : 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -243,24 +620,27 @@ class CameraViewScreen extends GetView<CameraViewController> {
   Widget _buildThresholdIndicator(String label, bool isActive, bool isTablet) {
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: isTablet ? 8 : 6,
-        vertical: isTablet ? 4 : 3,
+        horizontal: isTablet ? 12 : 8,
+        vertical: isTablet ? 6 : 4,
       ),
       decoration: BoxDecoration(
-        color: isActive
-            ? AppTheme.upsenTeal.withOpacity(0.2)
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(isTablet ? 8 : 6),
+        gradient: isActive
+            ? LinearGradient(
+                colors: [AppTheme.upsenTeal, AppTheme.upsenTealLight],
+              )
+            : null,
+        color: isActive ? null : Colors.transparent,
+        borderRadius: BorderRadius.circular(isTablet ? 10 : 8),
         border: Border.all(
           color: isActive ? AppTheme.upsenTeal : Colors.grey.shade600,
-          width: 1,
+          width: 1.5,
         ),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: isActive ? AppTheme.upsenTeal : Colors.grey.shade400,
-          fontSize: isTablet ? 10 : 8,
+          color: isActive ? Colors.white : Colors.grey.shade400,
+          fontSize: isTablet ? 12 : 10,
           fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
         ),
       ),
@@ -271,31 +651,50 @@ class CameraViewScreen extends GetView<CameraViewController> {
     return Positioned(
       left: 20,
       right: 20,
-      bottom: isTablet ? 180 : 160,
+      bottom: isTablet ? 200 : 180,
       child: Obx(() {
         final user = controller.detectedUser.value;
         final status = controller.recognitionStatus.value;
 
         return Container(
-          padding: EdgeInsets.all(isTablet ? 20 : 16),
+          padding: EdgeInsets.all(isTablet ? 24 : 20),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.85),
-            borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
-            border: Border.all(color: AppTheme.upsenTeal.withOpacity(0.3)),
+            gradient: LinearGradient(
+              colors: [
+                Colors.black.withValues(alpha: 0.9),
+                Colors.black.withValues(alpha: 0.8),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: AppTheme.upsenTeal.withValues(alpha: 0.4),
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.upsenTeal.withValues(alpha: 0.2),
+                blurRadius: 15,
+                spreadRadius: 3,
+              ),
+            ],
           ),
           child: Column(
             children: [
-              // User info if detected
               if (user != null) ...[
                 Row(
                   children: [
-                    // User avatar
                     Container(
-                      width: isTablet ? 60 : 50,
-                      height: isTablet ? 60 : 50,
+                      width: isTablet ? 70 : 60,
+                      height: isTablet ? 70 : 60,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppTheme.upsenTeal, width: 2),
+                        border: Border.all(color: AppTheme.upsenTeal, width: 3),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.upsenTeal.withValues(alpha: 0.3),
+                            blurRadius: 8,
+                          ),
+                        ],
                       ),
                       child: ClipOval(
                         child: user.imageUrl != null
@@ -308,9 +707,7 @@ class CameraViewScreen extends GetView<CameraViewController> {
                             : _buildDefaultAvatar(user.name, isTablet),
                       ),
                     ),
-                    SizedBox(width: isTablet ? 16 : 12),
-
-                    // User details
+                    SizedBox(width: isTablet ? 20 : 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -319,23 +716,24 @@ class CameraViewScreen extends GetView<CameraViewController> {
                             user.name,
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: isTablet ? 18 : 16,
+                              fontSize: isTablet ? 20 : 18,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           Text(
                             user.department,
                             style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: isTablet ? 14 : 12,
+                              color: AppTheme.upsenTealLight,
+                              fontSize: isTablet ? 16 : 14,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                           if (user.position.isNotEmpty)
                             Text(
                               user.position,
                               style: TextStyle(
-                                color: Colors.white60,
-                                fontSize: isTablet ? 12 : 10,
+                                color: Colors.white70,
+                                fontSize: isTablet ? 14 : 12,
                               ),
                             ),
                         ],
@@ -343,30 +741,34 @@ class CameraViewScreen extends GetView<CameraViewController> {
                     ),
                   ],
                 ),
-                SizedBox(height: isTablet ? 16 : 12),
+                SizedBox(height: isTablet ? 20 : 16),
               ],
-
-              // Status text
               Text(
                 status,
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: isTablet ? 16 : 14,
+                  fontSize: isTablet ? 18 : 16,
                   fontWeight: FontWeight.w600,
                 ),
                 textAlign: TextAlign.center,
               ),
-
-              // Attempts counter if active
               if (controller.isDetecting.value &&
                   controller.recognitionAttempts.value > 0) ...[
-                SizedBox(height: isTablet ? 8 : 6),
-                Text(
-                  'Attempt ${controller.recognitionAttempts.value} of 3',
-                  style: TextStyle(
-                    color: AppTheme.upsenTeal,
-                    fontSize: isTablet ? 12 : 10,
-                    fontWeight: FontWeight.w500,
+                SizedBox(height: isTablet ? 12 : 8),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.upsenTeal.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.upsenTeal),
+                  ),
+                  child: Text(
+                    'Attempt ${controller.recognitionAttempts.value} of 3',
+                    style: TextStyle(
+                      color: AppTheme.upsenTeal,
+                      fontSize: isTablet ? 14 : 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
@@ -388,7 +790,7 @@ class CameraViewScreen extends GetView<CameraViewController> {
           name.isNotEmpty ? name[0].toUpperCase() : '?',
           style: TextStyle(
             color: Colors.white,
-            fontSize: isTablet ? 24 : 20,
+            fontSize: isTablet ? 28 : 24,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -400,25 +802,27 @@ class CameraViewScreen extends GetView<CameraViewController> {
     return Positioned(
       left: 20,
       right: 20,
-      bottom: isTablet ? 40 : 30,
+      bottom: isTablet ? 50 : 40,
       child: Row(
         children: [
           Expanded(
             child: AppTheme.gradientButton(
-              text: 'Manual Entry',
-              icon: Icons.edit,
+              text: 'Manual',
+              icon: Icons.edit_outlined,
               onPressed: controller.goToManualEntry,
               isSecondary: true,
             ),
           ),
-          SizedBox(width: isTablet ? 16 : 12),
+          SizedBox(width: isTablet ? 20 : 16),
           Expanded(
             child: Obx(
               () => AppTheme.gradientButton(
                 text: controller.isProcessing.value
                     ? 'Processing...'
                     : 'Settings',
-                icon: controller.isProcessing.value ? null : Icons.settings,
+                icon: controller.isProcessing.value
+                    ? null
+                    : Icons.settings_outlined,
                 onPressed: controller.isProcessing.value
                     ? () {}
                     : controller.openSettings,
@@ -432,61 +836,101 @@ class CameraViewScreen extends GetView<CameraViewController> {
 
   Widget _buildHeader(bool isTablet) {
     return Positioned(
-      top: isTablet ? 20 : 10,
+      top: isTablet ? 20 : 15,
       left: 20,
       right: 20,
       child: Container(
-        padding: EdgeInsets.all(isTablet ? 16 : 12),
+        padding: EdgeInsets.all(isTablet ? 20 : 16),
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.7),
-          borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
+          gradient: LinearGradient(
+            colors: [
+              Colors.black.withValues(alpha: 0.8),
+              Colors.black.withValues(alpha: 0.6),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppTheme.upsenTeal.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [
-            IconButton(
-              icon: Icon(
-                Icons.arrow_back_ios,
-                color: Colors.white,
-                size: isTablet ? 24 : 20,
+            Container(
+              decoration: BoxDecoration(
+                color: AppTheme.upsenTeal.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppTheme.upsenTeal.withValues(alpha: 0.3),
+                ),
               ),
-              onPressed: controller.goBack,
+              child: IconButton(
+                icon: Icon(
+                  Icons.arrow_back_ios_rounded,
+                  color: Colors.white,
+                  size: isTablet ? 28 : 24,
+                ),
+                onPressed: controller.goBack,
+              ),
             ),
             Expanded(
               child: Text(
-                'Face Recognition Attendance',
+                'Face Recognition',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: isTablet ? 20 : 18,
+                  fontSize: isTablet ? 24 : 20,
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
               ),
             ),
-            // Status indicator
             Obx(
-              () => Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: isTablet ? 12 : 10,
-                    height: isTablet ? 12 : 10,
-                    decoration: BoxDecoration(
-                      color: controller.isDetecting.value
-                          ? Colors.green
-                          : Colors.orange,
-                      shape: BoxShape.circle,
-                    ),
+              () => Container(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color:
+                      (controller.isDetecting.value
+                              ? Colors.green
+                              : Colors.orange)
+                          .withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: controller.isDetecting.value
+                        ? Colors.green
+                        : Colors.orange,
                   ),
-                  SizedBox(width: isTablet ? 8 : 6),
-                  Text(
-                    controller.isDetecting.value ? 'ACTIVE' : 'PAUSED',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: isTablet ? 12 : 10,
-                      fontWeight: FontWeight.bold,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: isTablet ? 12 : 10,
+                      height: isTablet ? 12 : 10,
+                      decoration: BoxDecoration(
+                        color: controller.isDetecting.value
+                            ? Colors.green
+                            : Colors.orange,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color:
+                                (controller.isDetecting.value
+                                        ? Colors.green
+                                        : Colors.orange)
+                                    .withValues(alpha: 0.5),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                    SizedBox(width: isTablet ? 10 : 8),
+                    Text(
+                      controller.isDetecting.value ? 'ACTIVE' : 'PAUSED',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: isTablet ? 14 : 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -494,186 +938,4 @@ class CameraViewScreen extends GetView<CameraViewController> {
       ),
     );
   }
-}
-
-// FIXED Face Overlay Painter
-class AttendanceFaceOverlayPainter extends CustomPainter {
-  final List<Face> faces;
-  final double confidence;
-  final DetectedUser? detectedUser;
-
-  AttendanceFaceOverlayPainter({
-    required this.faces,
-    required this.confidence,
-    this.detectedUser,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (faces.isEmpty) return;
-
-    print("🎨 Painting ${faces.length} faces on canvas ${size}");
-
-    for (final face in faces) {
-      final rect = face.boundingBox;
-      print("🎨 Drawing face at: $rect");
-
-      _drawFaceRect(canvas, rect, size);
-      _drawConfidenceIndicator(canvas, rect, size);
-    }
-  }
-
-  void _drawFaceRect(Canvas canvas, Rect rect, Size size) {
-    final isHighConfidence = confidence >= 0.90;
-    final isMedium = confidence >= 0.75;
-
-    Color rectColor;
-    if (isHighConfidence) {
-      rectColor = Colors.green;
-    } else if (isMedium) {
-      rectColor = Colors.orange;
-    } else {
-      rectColor = AppTheme.upsenTeal;
-    }
-
-    // Face rectangle
-    final Paint facePaint = Paint()
-      ..color = rectColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0;
-
-    // Draw rounded rectangle
-    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(12));
-    canvas.drawRRect(rrect, facePaint);
-
-    // Draw corner indicators
-    _drawCornerIndicators(canvas, rect, rectColor);
-  }
-
-  void _drawCornerIndicators(Canvas canvas, Rect rect, Color color) {
-    final Paint cornerPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4.0;
-
-    final cornerLength = 20.0;
-
-    // Top-left corner
-    canvas.drawLine(
-      Offset(rect.left, rect.top + cornerLength),
-      Offset(rect.left, rect.top),
-      cornerPaint,
-    );
-    canvas.drawLine(
-      Offset(rect.left, rect.top),
-      Offset(rect.left + cornerLength, rect.top),
-      cornerPaint,
-    );
-
-    // Top-right corner
-    canvas.drawLine(
-      Offset(rect.right - cornerLength, rect.top),
-      Offset(rect.right, rect.top),
-      cornerPaint,
-    );
-    canvas.drawLine(
-      Offset(rect.right, rect.top),
-      Offset(rect.right, rect.top + cornerLength),
-      cornerPaint,
-    );
-
-    // Bottom-left corner
-    canvas.drawLine(
-      Offset(rect.left, rect.bottom - cornerLength),
-      Offset(rect.left, rect.bottom),
-      cornerPaint,
-    );
-    canvas.drawLine(
-      Offset(rect.left, rect.bottom),
-      Offset(rect.left + cornerLength, rect.bottom),
-      cornerPaint,
-    );
-
-    // Bottom-right corner
-    canvas.drawLine(
-      Offset(rect.right - cornerLength, rect.bottom),
-      Offset(rect.right, rect.bottom),
-      cornerPaint,
-    );
-    canvas.drawLine(
-      Offset(rect.right, rect.bottom - cornerLength),
-      Offset(rect.right, rect.bottom),
-      cornerPaint,
-    );
-  }
-
-  void _drawConfidenceIndicator(Canvas canvas, Rect rect, Size size) {
-    if (confidence == 0) return;
-
-    final isHighConfidence = confidence >= 0.90;
-    final isMedium = confidence >= 0.75;
-
-    Color bgColor;
-
-    if (isHighConfidence) {
-      bgColor = Colors.green;
-    } else if (isMedium) {
-      bgColor = Colors.orange;
-    } else {
-      bgColor = Colors.red;
-    }
-
-    // Background for indicator
-    final indicatorRect = Rect.fromLTWH(rect.left, rect.top - 35, 120, 30);
-
-    final Paint bgPaint = Paint()..color = bgColor.withOpacity(0.9);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(indicatorRect, const Radius.circular(8)),
-      bgPaint,
-    );
-
-    // Confidence text
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: '${(confidence * 100).toStringAsFixed(0)}%',
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 14,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    );
-
-    textPainter.layout();
-    textPainter.paint(canvas, Offset(rect.left + 8, rect.top - 28));
-
-    // Status text
-    String statusText;
-    if (isHighConfidence) {
-      statusText = 'AUTO';
-    } else if (isMedium) {
-      statusText = 'CONFIRM';
-    } else {
-      statusText = 'SCANNING';
-    }
-
-    final statusPainter = TextPainter(
-      text: TextSpan(
-        text: statusText,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 10,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    );
-
-    statusPainter.layout();
-    statusPainter.paint(canvas, Offset(rect.left + 60, rect.top - 26));
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

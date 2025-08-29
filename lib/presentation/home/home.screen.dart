@@ -142,7 +142,7 @@ class HomeScreen extends GetView<HomeController> {
                   ),
                   SizedBox(height: 2),
                   Text(
-                    'Employee Attendance Portal',
+                    'Attendance Portal',
                     style: TextStyle(
                       color: Colors.white70,
                       fontSize: isTablet ? 16 : 14,
@@ -243,7 +243,7 @@ class HomeScreen extends GetView<HomeController> {
             ),
             height: isTablet ? 120 : 100,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.8),
+              color: Colors.white.withValues(alpha: 0.8),
               borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
             ),
             child: Center(
@@ -268,12 +268,12 @@ class HomeScreen extends GetView<HomeController> {
     return Container(
       padding: EdgeInsets.all(isTablet ? 20 : 16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.8),
+        color: Colors.white.withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
-        border: Border.all(color: Colors.white.withOpacity(0.3)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: Offset(0, 2),
           ),
@@ -320,7 +320,7 @@ class HomeScreen extends GetView<HomeController> {
           borderRadius: BorderRadius.circular(isTablet ? 20 : 16),
           boxShadow: [
             BoxShadow(
-              color: Color(0xFF26a69a).withOpacity(0.4),
+              color: Color(0xFF26a69a).withValues(alpha: 0.4),
               blurRadius: 15,
               offset: Offset(0, 8),
             ),
@@ -416,7 +416,7 @@ class HomeScreen extends GetView<HomeController> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black26,
                         blurRadius: 4,
                         offset: Offset(0, 2),
                       ),

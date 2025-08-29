@@ -8,6 +8,7 @@ import 'package:get/get.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:image/image.dart' as img;
 
+import '../../../app/data/providers/models/detect_user.dart';
 import '../../../app/data/providers/repositories/attendanxe_repository.dart';
 import '../../../app/services/face_recognition_service.dart';
 import '../../../app/services/offline_sync_service.dart';
@@ -74,7 +75,6 @@ class CameraViewController extends GetxController {
         return;
       }
 
-      // Use front camera for attendance kiosk
       final frontCamera = cameras.firstWhere(
         (camera) => camera.lensDirection == CameraLensDirection.front,
         orElse: () => cameras.first,
@@ -82,20 +82,29 @@ class CameraViewController extends GetxController {
 
       cameraController = CameraController(
         frontCamera,
-        ResolutionPreset.high,
+        ResolutionPreset
+            .high, // Changed from high to medium for better 4:3 ratio
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.yuv420,
       );
 
       await cameraController!.initialize();
+
+      // Log camera info for debugging
+      final previewSize = cameraController!.value.previewSize;
+      print("Camera initialized:");
+      print("  Resolution: ${cameraController!.resolutionPreset}");
+      print("  Preview size: $previewSize");
+      print("  Aspect ratio: ${cameraController!.value.aspectRatio}");
+
       isInitialized(true);
       recognitionStatus('Camera ready - position your face');
       _startDetection();
 
-      print("✅ Camera initialized for attendance");
+      print("Camera initialized for 4:3 attendance");
     } catch (e) {
       errorMessage('Camera initialization failed: ${e.toString()}');
-      print("❌ Camera error: $e");
+      print("Camera error: $e");
     }
   }
 
@@ -129,14 +138,28 @@ class CameraViewController extends GetxController {
       _isProcessingFrame = true;
 
       final image = await cameraController!.takePicture();
-      final inputImage = InputImage.fromFilePath(image.path);
 
+      // Get actual image file dimensions for comparison
+      final imageFile = File(image.path);
+      final imageBytes = await imageFile.readAsBytes();
+      final decodedImage = img.decodeImage(imageBytes);
+
+      print("Image Analysis:");
+      print(
+        "  Captured image dimensions: ${decodedImage?.width}x${decodedImage?.height}",
+      );
+      print("  Camera preview size: ${getPreviewSize}");
+      print("  Camera image size: ${getImageSize}");
+
+      final inputImage = InputImage.fromFilePath(image.path);
       final detectedFaces = await _faceDetector.processImage(inputImage);
       faces.assignAll(detectedFaces);
 
-      print("🔍 Detected ${detectedFaces.length} faces");
+      print("Face Detection Results:");
+      print("  Detected ${detectedFaces.length} faces");
       if (detectedFaces.isNotEmpty) {
-        print("Face bounds: ${detectedFaces.first.boundingBox}");
+        print("  Face bounds: ${detectedFaces.first.boundingBox}");
+        print("  Image used by ML Kit: ${inputImage.metadata?.size}");
       }
 
       if (detectedFaces.isNotEmpty) {
@@ -378,7 +401,7 @@ class CameraViewController extends GetxController {
               Get.back();
               goToManualEntry();
             },
-            child: Text('Manual Entry'),
+            child: Text('Manual'),
           ),
         ],
       ),
@@ -434,13 +457,35 @@ class CameraViewController extends GetxController {
   Size get getImageSize {
     if (!isInitialized.value || cameraController == null) return Size.zero;
     final previewSize = cameraController!.value.previewSize;
-    return Size(previewSize?.height ?? 0, previewSize?.width ?? 0);
+    if (previewSize == null) return Size.zero;
+
+    // FIXED: Return the actual image size that ML Kit processes
+    // This should match the resolution of images taken by takePicture()
+    return Size(previewSize.width, previewSize.height);
   }
 
   Size get getPreviewSize {
     if (!isInitialized.value || cameraController == null) return Size.zero;
     final previewSize = cameraController!.value.previewSize;
-    return Size(previewSize?.width ?? 0, previewSize?.height ?? 0);
+    if (previewSize == null) return Size.zero;
+
+    return Size(previewSize.width, previewSize.height);
+  }
+
+  Size get getCaptureSize {
+    if (!isInitialized.value || cameraController == null) return Size.zero;
+
+    // This might be different from preview size
+    // Check camera controller's resolution preset
+    final previewSize = cameraController!.value.previewSize;
+    if (previewSize == null) return Size.zero;
+
+    // For debugging - let's see what we get
+    print("Camera Debug:");
+    print("  Preview size: $previewSize");
+    print("  Aspect ratio: ${cameraController!.value.aspectRatio}");
+
+    return Size(previewSize.width, previewSize.height);
   }
 
   void goToManualEntry() {
@@ -465,27 +510,4 @@ class CameraViewController extends GetxController {
     cameraController?.dispose();
     super.onClose();
   }
-}
-
-// Data model for detected user
-class DetectedUser {
-  final int id;
-  final String name;
-  final String department;
-  final String position;
-  final String? imageUrl;
-  final double confidence;
-  final String action;
-  final DateTime timestamp;
-
-  DetectedUser({
-    required this.id,
-    required this.name,
-    required this.department,
-    required this.position,
-    this.imageUrl,
-    required this.confidence,
-    required this.action,
-    required this.timestamp,
-  });
 }

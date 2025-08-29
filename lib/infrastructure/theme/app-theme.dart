@@ -39,7 +39,7 @@ class AppTheme {
   // Shadows
   static List<BoxShadow> get softShadow => [
     BoxShadow(
-      color: upsenTeal.withOpacity(0.1),
+      color: upsenTeal.withValues(alpha: 0.1),
       blurRadius: 10,
       offset: const Offset(0, 5),
     ),
@@ -47,7 +47,7 @@ class AppTheme {
 
   static List<BoxShadow> get glowShadow => [
     BoxShadow(
-      color: upsenTeal.withOpacity(0.3),
+      color: upsenTeal.withValues(alpha: 0.3),
       blurRadius: 15,
       offset: const Offset(0, 5),
     ),
@@ -55,12 +55,12 @@ class AppTheme {
 
   // Decorations
   static BoxDecoration get glassmorphismDecoration => BoxDecoration(
-    color: Colors.white.withOpacity(0.8),
+    color: Colors.white.withValues(alpha: 0.8),
     borderRadius: BorderRadius.circular(16),
-    border: Border.all(color: Colors.white.withOpacity(0.3)),
+    border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
     boxShadow: [
       BoxShadow(
-        color: Colors.black.withOpacity(0.05),
+        color: Colors.black.withValues(alpha: 0.05),
         blurRadius: 10,
         offset: const Offset(0, 5),
       ),
